@@ -40,3 +40,15 @@ New management software support should only require:
 3. Optionally add provider-specific validation schema.
 
 No core routing or business logic rewrite needed.
+
+## GitHub: CI and syncing
+
+- **CI**: Pushes and pull requests to `main` run [GitHub Actions](.github/workflows/ci.yml) (install, Ruff, pytest).
+- **Dependency updates**: [Dependabot](.github/dependabot.yml) opens weekly pip PRs and monthly Actions updates.
+- **Push changes in one step** (after you commit locally, or it will commit for you):
+
+```bash
+./scripts/sync-push.sh "your commit message"
+```
+
+Cursor/VS Code does not auto-push to GitHub; use the script above or **Source Control → Sync** / `git push` after saving.
