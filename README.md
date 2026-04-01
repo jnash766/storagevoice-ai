@@ -31,6 +31,17 @@ Production-oriented, multi-tenant backend scaffold for a voice + automation plat
 3. Run API:
    - `uvicorn apps.api_service.src.main:app --reload --host 0.0.0.0 --port 8000`
 
+## Database migrations (PostgreSQL)
+
+- Configure `DATABASE_URL` in `.env`
+- Run migrations:
+  - `alembic upgrade head`
+- Current core tables:
+  - `tenants`
+  - `tenant_provider_configs`
+  - `operator_contacts`
+  - `audit_logs`
+
 ## Why provider adapters?
 
 New management software support should only require:

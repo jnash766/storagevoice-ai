@@ -1,5 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
 
+from apps.api_service.src.db.session import get_db
 from apps.api_service.src.schemas.onboarding import (
     TenantOnboardingRequest,
     TenantOnboardingResponse,
@@ -8,7 +10,6 @@ from apps.api_service.src.services.tenant_service import TenantService
 from providers.registry.factory import supported_providers
 
 router = APIRouter(prefix="/onboarding", tags=["onboarding"])
-tenant_service = TenantService()
 
 
 @router.get("/providers")
@@ -20,7 +21,10 @@ async def list_storage_software() -> list[dict[str, str]]:
 
 
 @router.post("/tenant", response_model=TenantOnboardingResponse)
-async def onboard_tenant(payload: TenantOnboardingRequest) -> TenantOnboardingResponse:
+async def onboard_tenant(
+    payload: TenantOnboardingRequest, db: Session = Depends(get_db)
+) -> TenantOnboardingResponse:
+    tenant_service = TenantService(db)
     try:
         tenant = await tenant_service.onboard_tenant(
             business_name=payload.business_name,

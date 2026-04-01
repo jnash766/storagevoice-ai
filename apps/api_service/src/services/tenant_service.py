@@ -1,29 +1,26 @@
+import json
 from dataclasses import dataclass
-from uuid import uuid4
 
+from sqlalchemy.orm import Session
+
+from apps.api_service.src.models.audit_log import AuditLog
+from apps.api_service.src.models.operator_contact import OperatorContact
+from apps.api_service.src.models.provider_config import TenantProviderConfig
+from apps.api_service.src.models.tenant import Tenant
 from packages.common.security import SecretCipher
 from providers.registry.factory import get_provider
 
 
 @dataclass
-class TenantRecord:
+class OnboardedTenant:
     tenant_id: str
-    business_name: str
     provider_key: str
-    encrypted_api_key: str
-    provider_base_url: str
-    operator_phone_e164: str
 
 
 class TenantService:
-    """
-    In-memory service for scaffold phase.
-    Replace with SQLAlchemy repository in next step.
-    """
-
-    def __init__(self) -> None:
+    def __init__(self, db: Session) -> None:
+        self._db = db
         self._cipher = SecretCipher()
-        self._tenants: dict[str, TenantRecord] = {}
 
     async def onboard_tenant(
         self,
@@ -32,7 +29,7 @@ class TenantService:
         provider_base_url: str,
         provider_api_key: str,
         operator_phone_e164: str,
-    ) -> TenantRecord:
+    ) -> OnboardedTenant:
         provider = get_provider(provider_key)
         is_valid, reason = await provider.validate_credentials(
             {"base_url": provider_base_url, "api_key": provider_api_key}
@@ -40,14 +37,35 @@ class TenantService:
         if not is_valid:
             raise ValueError(f"Provider credential validation failed: {reason}")
 
-        tenant_id = str(uuid4())
-        record = TenantRecord(
-            tenant_id=tenant_id,
+        tenant = Tenant(
             business_name=business_name,
+        )
+        self._db.add(tenant)
+        self._db.flush()
+
+        provider_config = TenantProviderConfig(
+            tenant_id=tenant.id,
             provider_key=provider_key,
             encrypted_api_key=self._cipher.encrypt(provider_api_key),
             provider_base_url=provider_base_url,
-            operator_phone_e164=operator_phone_e164,
         )
-        self._tenants[tenant_id] = record
-        return record
+        self._db.add(provider_config)
+
+        operator_contact = OperatorContact(tenant_id=tenant.id, phone_e164=operator_phone_e164)
+        self._db.add(operator_contact)
+
+        audit_log = AuditLog(
+            tenant_id=tenant.id,
+            event_type="tenant_onboarded",
+            details=json.dumps(
+                {
+                    "provider_key": provider_key,
+                    "provider_base_url": provider_base_url,
+                    "operator_phone_e164": operator_phone_e164,
+                }
+            ),
+        )
+        self._db.add(audit_log)
+        self._db.commit()
+        self._db.refresh(tenant)
+        return OnboardedTenant(tenant_id=str(tenant.id), provider_key=provider_key)
